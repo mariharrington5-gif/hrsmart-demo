@@ -2530,9 +2530,9 @@ function efSelLeave(el,t){
 }
 function efSubmit(){
   const fn=document.getElementById('ef-fn').value.trim(),ln=document.getElementById('ef-ln').value.trim(),sd=document.getElementById('ef-sd').value;
-  if(!fn||!ln){alert('Please enter your name.');return;}
-  if(!efLeave){alert('Please select a leave type.');return;}
-  if(!sd){alert('Please enter a start date.');return;}
+  if(!fn||!ln){showToast('Name required','Please enter your first and last name.','warn');return;}
+  if(!efLeave){showToast('Leave type required','Please select a type of leave.','warn');return;}
+  if(!sd){showToast('Start date required','Please enter the leave start date.','warn');return;}
   const fmt=d=>{if(!d)return'TBD';const[y,m,day]=d.split('-');return`${m}/${day}/${y}`};
   const rows=[['Employee',`${fn} ${ln}`],['Leave Type',efLeave],['Start Date',fmt(sd)],['Return Date',fmt(document.getElementById('ef-ed').value)],['Department',document.getElementById('ef-dept').value||'—'],['Job Title',document.getElementById('ef-jt').value||'—'],['Reference #','LOA-'+Math.floor(Math.random()*9000+1000)]];
   document.getElementById('efConfGrid').innerHTML=rows.map(([k,v])=>`<div class="conf-item"><div class="ck">${k}</div><div class="cv">${v}</div></div>`).join('');
@@ -2916,9 +2916,24 @@ function filterRoster() {
   renderRoster(filtered);
 }
 
+let editingEmployeeId = null;
 function editEmployee(id) {
   const e = rosterData.find(x=>x.id===id);
-  if (e) showToast('Edit employee', `Editing ${e.first} ${e.last} — full edit form would open here.`);
+  if (!e) return;
+  editingEmployeeId = id;
+  document.getElementById('empFirstName').value = e.first || '';
+  document.getElementById('empLastName').value = e.last || '';
+  document.getElementById('empEmail').value = e.email || '';
+  document.getElementById('empTitle').value = e.title || '';
+  document.getElementById('empManager').value = e.manager === '—' ? '' : (e.manager || '');
+  const deptEl = document.getElementById('empDept'); if (deptEl) deptEl.value = e.dept || 'Engineering';
+  const typeEl = document.getElementById('empType'); if (typeEl) typeEl.value = e.empType || 'Full-Time';
+  // Set start date (convert "Apr 1, 2025" → "2025-04-01" for date input)
+  try { const d = new Date(e.start); if (!isNaN(d)) document.getElementById('empStart').value = d.toISOString().split('T')[0]; } catch(x){}
+  // Update modal title to Edit mode
+  const titleEl = document.querySelector('#newEmployeeModal [style*="Playfair"]');
+  if (titleEl) titleEl.textContent = '✏️ Edit Employee';
+  document.getElementById('newEmployeeModal').style.display = 'flex';
 }
 function removeEmployee(id) {
   const e = rosterData.find(x=>x.id===id);
@@ -2936,6 +2951,9 @@ function closeEmployeeModal() {
   ['empFirstName','empLastName','empEmail','empTitle','empManager','empStart'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   const dept = document.getElementById('empDept'); if(dept) dept.value='Engineering';
   const type = document.getElementById('empType'); if(type) type.value='Full-Time';
+  const titleEl = document.querySelector('#newEmployeeModal [style*="Playfair"]');
+  if (titleEl) titleEl.textContent = '👤 Add Employee';
+  editingEmployeeId = null;
 }
 function saveEmployee() {
   const first = document.getElementById('empFirstName').value.trim();
@@ -2948,11 +2966,21 @@ function saveEmployee() {
   const empType = document.getElementById('empType').value;
   if (!first || !last || !title || !start) { showToast('Missing info', 'First name, last name, title, and start date are required.', 'warn'); return; }
   const startFormatted = new Date(start).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  const newId = 'EMP-' + (1049 + rosterData.length);
-  rosterData.push({ id:newId, first, last, dept, title, manager:manager||'—', start:startFormatted, email:email||`${first.toLowerCase()}.${last.toLowerCase()}@company.com`, status:'active', empType });
-  renderRoster();
-  closeEmployeeModal();
-  showToast('Employee added ✓', `${first} ${last} has been added to the roster.`);
+  if (editingEmployeeId) {
+    // Edit existing employee
+    const e = rosterData.find(x=>x.id===editingEmployeeId);
+    if (e) { e.first=first; e.last=last; e.email=email||e.email; e.title=title; e.dept=dept; e.manager=manager||'—'; e.start=startFormatted; e.empType=empType; }
+    renderRoster();
+    closeEmployeeModal();
+    showToast('Employee updated ✓', `${first} ${last}'s record has been updated.`);
+  } else {
+    // Add new employee
+    const newId = 'EMP-' + (1049 + rosterData.length);
+    rosterData.push({ id:newId, first, last, dept, title, manager:manager||'—', start:startFormatted, email:email||`${first.toLowerCase()}.${last.toLowerCase()}@company.com`, status:'active', empType });
+    renderRoster();
+    closeEmployeeModal();
+    showToast('Employee added ✓', `${first} ${last} has been added to the roster.`);
+  }
 }
 
 // ── CSV / ROSTER IMPORT ──
@@ -4288,7 +4316,7 @@ function processDocUpload(file) {
               <span style="background:linear-gradient(135deg,var(--teal),var(--teal2));color:#fff;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px">AI</span>
             </div>
             <div id="aiQContent" style="font-size:.84rem;line-height:1.7;color:var(--text)"></div>
-            <button class="ai-gen-btn" style="margin-top:12px;font-size:.78rem" onclick="alert('Questions added to template!')">+ Add All to Template</button>
+            <button class="ai-gen-btn" style="margin-top:12px;font-size:.78rem" onclick="showToast('Questions Added ✓','All AI-generated questions have been added to this template. Save the template to finalize.')">+ Add All to Template</button>
           </div>
         </div>
 
@@ -4637,10 +4665,14 @@ function renderTracker(f){
     <td style="font-size:.78rem;color:var(--muted)">${r.due}</td>
     <td><div style="display:flex;align-items:center;gap:7px"><div class="prog-bar-wrap"><div class="prog-bar" style="width:${r.pct}%"></div></div><span style="font-size:.74rem;color:var(--muted)">${r.pct}%</span></div></td>
     <td><span class="status-pill ${r.sc}"><span class="dot"></span>${r.st}</span></td>
-    <td><button class="action-btn" onclick="alert('${r.st==='Overdue'?'Reminder sent to '+r.n+'!':'Viewing '+r.n+'\'s assessment.'}')">${r.st==='Overdue'?'🔔 Remind':'View'}</button></td>
+    <td><button class="action-btn" onclick="assessAction('${r.n.replace(/'/g,"\\'")}',${r.st==='Overdue'})">${r.st==='Overdue'?'🔔 Remind':'👁 View'}</button></td>
   </tr>`).join('');
 }
 
+function assessAction(name, isOverdue) {
+  if (isOverdue) showToast('Reminder Sent 📧', `A follow-up reminder has been sent to ${name}. They have 2 business days to complete.`);
+  else showToast('Assessment Details', `Viewing ${name}'s assessment — full response view coming in next release.`);
+}
 function tFilter(f,btn){document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderTracker(f);}
 
 async function genInsights(){
@@ -5077,19 +5109,27 @@ function renderEmpLeaveStatus() {
 
   // Has active leave
   const totalDays = (() => {
-    const starts = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const parseDate = s => { const p=s.split(' '); return new Date(`${p[1]} ${p[0]} 2026`); };
+    // Handle both "Apr 6" and "05/20/2026" (MM/DD/YYYY) date formats
+    const parseDate = s => {
+      if (!s || s === 'TBD') return null;
+      if (s.includes('/')) { const d = new Date(s); return isNaN(d) ? null : d; }
+      const p = s.split(' ');
+      const d = new Date(`${p[1]} ${p[0]} 2026`);
+      return isNaN(d) ? null : d;
+    };
     try {
       const start = parseDate(r.start), end = parseDate(r.end);
-      return Math.ceil((end-start)/(1000*60*60*24));
+      if (!start || !end) return typeof r.days === 'number' ? r.days : 90;
+      return Math.max(1, Math.ceil((end-start)/(1000*60*60*24)));
     } catch(e) { return 90; }
   })();
-  const daysUsed = Math.max(0, totalDays - r.days);
-  const pct = Math.min(100, Math.round(daysUsed / totalDays * 100));
+  const daysRemaining = typeof r.days === 'number' ? r.days : totalDays;
+  const daysUsed = Math.max(0, totalDays - daysRemaining);
+  const pct = totalDays > 0 ? Math.min(100, Math.round(daysUsed / totalDays * 100)) : 0;
   const circumference = 2 * Math.PI * 36;
   const dashOffset = circumference * (1 - pct / 100);
 
-  const statusColor = {'Awaiting Cert':'#D4924A','Pending Approval':'#9C7BB0','Active':'#C8A46A','Returning':'#111111','New':'#6B9080','Closed':'#94a3b8'}[r.status] || '#C8A46A';
+  const statusColor = {'Awaiting Cert':'#D4924A','Pending Approval':'#9C7BB0','Approved':'#3A7A50','Active':'#C8A46A','Returning':'#111111','New':'#6B9080','Closed':'#94a3b8'}[r.status] || '#C8A46A';
 
   // Determine what action the employee needs to take
   const empActions = r.timeline.filter(t => !t.done && t.active).map(t => ({
@@ -5113,8 +5153,8 @@ function renderEmpLeaveStatus() {
             stroke-linecap="round" style="transition:stroke-dashoffset .8s ease"/>
         </svg>
         <div class="ring-text">
-          <div class="ring-num">${r.days}</div>
-          <div class="ring-lbl">days left</div>
+          <div class="ring-num" style="font-size:${r.days==='TBD'?'1rem':'1.4rem'}">${r.days}</div>
+          <div class="ring-lbl">${r.days==='TBD'?'pending':'days left'}</div>
         </div>
       </div>
       <div class="loa-status-detail">
