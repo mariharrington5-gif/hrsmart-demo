@@ -762,6 +762,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
   <div class="date-badge" id="dateBadge"></div>
   <span class="role-badge admin" id="roleBadge">HR Admin</span>
+  <button id="backToEmpBtn" onclick="switchBackToEmployee()" style="display:none;background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:6px;padding:5px 13px;font-family:'Inter',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer">👤 Back to Employee View</button>
   <button class="hr-logout-btn" onclick="logout()">← Log Out</button>
 </div>
 
@@ -5336,7 +5337,10 @@ function elReset(){
   elLeave='';
 }
 function switchToHRView(){
-  // Switch directly to HR Admin view without Supabase re-auth — keeps all in-memory data intact
+  // Save employee session so we can restore it after HR review
+  window.savedEmployee = currentEmployee ? JSON.parse(JSON.stringify(currentEmployee)) : null;
+  // But keep the live LOA reference (for status updates)
+  if(currentEmployee && currentEmployee.loa) window.savedEmpLoa = currentEmployee.loa;
   document.getElementById('emp-shell').style.display='none';
   document.getElementById('login-screen').style.display='none';
   currentEmployee=null;
@@ -5346,6 +5350,9 @@ function switchToHRView(){
   shell.setAttribute('data-role','admin');
   const badge=document.getElementById('roleBadge');
   if(badge){badge.textContent='HR Admin';badge.className='role-badge admin';}
+  // Show "Back to Employee" button if we came from employee view
+  const backBtn=document.getElementById('backToEmpBtn');
+  if(backBtn&&window.savedEmployee) backBtn.style.display='inline-block';
   // Merge pending submissions into loaData before rendering
   if(window.hrPending&&window.hrPending.length){
     window.hrPending.forEach(r=>{if(!loaData.find(x=>x.id===r.id))loaData.unshift(r);});
@@ -5353,6 +5360,20 @@ function switchToHRView(){
   renderTable('all');
   showView('dashboard');
   showToast('Switched to HR Admin View','You can now review and approve the submitted leave request.');
+}
+function switchBackToEmployee(){
+  if(!window.savedEmployee) return;
+  document.getElementById('hr-shell').style.display='none';
+  document.getElementById('login-screen').style.display='none';
+  // Restore employee — use live LOA object so status updates are reflected
+  currentEmployee = window.savedEmployee;
+  if(window.savedEmpLoa) currentEmployee.loa = window.savedEmpLoa;
+  userRole='employee';
+  document.getElementById('emp-shell').style.display='block';
+  // Re-render employee leave status so it shows the updated HR decision
+  if(typeof renderEmpLeaveStatus==='function') renderEmpLeaveStatus();
+  const fn = currentEmployee.name ? currentEmployee.name.split(' ')[0] : 'Employee';
+  showToast('Back to Employee View', `Showing leave status for ${currentEmployee.name}.`);
 }
 
 // ══ EMPLOYEE DOCUMENT BROWSER ══
