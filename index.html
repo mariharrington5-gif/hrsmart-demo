@@ -59,7 +59,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
 
 /* ── CARD ── */
-.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);border:1px solid var(--border)}
 .card-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .card-title{font-family:'Playfair Display',serif;font-size:.95rem;font-weight:700;color:var(--navy)}
 .card-body{padding:0}
@@ -2081,6 +2081,9 @@ function addEmailLog(name,type,caseId){
 // ── ROLE ──
 let userRole = 'admin';
 
+// ── PENDING EMPLOYEE SUBMISSIONS (never reset, survives loadCompany) ──
+window.hrPending = window.hrPending || [];
+
 // ── LOA DATA ──
 let loaData = [
   {id:'LOA-1041',name:'Maria Santos',title:'Assembly Tech',type:'FMLA/CFRA',tclass:'fmla',start:'Apr 28',end:'Jul 21',status:'Awaiting Cert',sclass:'sp-cert',days:68,urgent:true,
@@ -2750,6 +2753,7 @@ const _origShowView = showView;
 window.showView = function(v) {
   _origShowView(v);
   if (v === 'analytics') renderAnalytics();
+  if (v === 'dashboard') renderTable('all');
 };
 
 // ── COMPLIANCE ──
@@ -3333,6 +3337,10 @@ function loadCompany(id) {
   currentCompany = id;
   const co = COMPANIES[id];
   loaData = co.loa;
+  // Merge any employee-submitted requests from window.hrPending
+  if(window.hrPending&&window.hrPending.length){
+    window.hrPending.forEach(r=>{ if(!loaData.find(x=>x.id===r.id)) loaData.unshift(r); });
+  }
   rosterData = co.roster;
   empDirectory = co.empDir;
   analyticsData.departments = co.depts;
@@ -4835,6 +4843,11 @@ function eaSubmitAssess(){
         <div style="font-size:3rem">✅</div>
         <h3>Request Submitted!</h3>
         <p>Your leave request has been received. HR will reach out within 2 business days with next steps and any required forms.</p>
+        <!-- HR switch banner — prominent, right below the title -->
+        <div id="hrSwitchBanner" style="background:var(--navy);border-radius:10px;padding:14px 18px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div style="color:#fff;font-size:.88rem;font-weight:600">👔 Demo: Switch to HR Admin to review this request</div>
+          <button onclick="switchToHRView()" style="background:#fff;color:var(--navy);border:none;border-radius:7px;padding:8px 18px;font-family:'Inter',sans-serif;font-size:.84rem;font-weight:700;cursor:pointer;white-space:nowrap">View as HR Admin →</button>
+        </div>
         <div style="display:flex;justify-content:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
           <span class="status-pill sp-pending">⏳ Pending HR Review</span>
           <span class="status-pill sp-approved">✉️ HR Notified</span>
@@ -5255,10 +5268,64 @@ function elSubmit(){
   if(!elLeave){alert('Please select a leave type.');return;}
   if(!sd){alert('Please enter a start date.');return;}
   const fmt=d=>{if(!d)return'TBD';const[y,m,day]=d.split('-');return`${m}/${day}/${y}`};
-  const rows=[['Employee',`${fn} ${ln}`],['Leave Type',elLeave],['Start Date',fmt(sd)],['Return Date',fmt(document.getElementById('el-ed').value)],['Department',document.getElementById('el-dept').value||'—'],['Reference #','LOA-'+Math.floor(Math.random()*9000+1000)]];
+  const ed=document.getElementById('el-ed').value;
+  const dept=document.getElementById('el-dept').value||'—';
+  const jt=document.getElementById('el-jt').value||'Employee';
+  const desc=document.getElementById('el-desc').value||'';
+  // Calculate days
+  let daysCount=0;
+  if(sd&&ed){const ms=new Date(ed)-new Date(sd);daysCount=Math.max(1,Math.round(ms/(1000*60*60*24)));}
+  // Generate reference ID
+  const refId='LOA-'+Math.floor(Math.random()*9000+1000);
+  // Map leave type to tclass
+  const tclassMap={'FMLA/CFRA':'fmla','Pregnancy Disability':'pdl','Baby Bonding':'bonding','Personal Leave':'personal','Military Leave':'military','Reproductive Loss':'repro'};
+  const today=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  // Build new LOA record
+  const newRecord={
+    id:refId,
+    name:`${fn} ${ln}`,
+    title:jt,
+    dept:dept,
+    type:elLeave,
+    tclass:tclassMap[elLeave]||'fmla',
+    start:fmt(sd),
+    end:ed?fmt(ed):'TBD',
+    status:'Pending Approval',
+    sclass:'sp-pending',
+    days:daysCount||'TBD',
+    urgent:false,
+    certApproved:false,
+    desc:desc,
+    timeline:[
+      {step:'Request Received',date:today,done:true},
+      {step:'HR Review',note:'Awaiting HR review — within 2 business days',date:'TBD',done:false,active:true},
+      {step:'Eligibility Confirmed',date:'TBD',done:false},
+      {step:'Leave Decision',date:'TBD',done:false},
+      {step:'Return to Work',date:ed?fmt(ed):'TBD',done:false}
+    ],
+    next:`New leave request from ${fn} ${ln} (${elLeave}). Submitted ${today}. Review eligibility and respond within 2 business days.${desc?' Notes: '+desc:''}`
+  };
+  // Store in window.hrPending (survives loadCompany resets, accessible everywhere)
+  window.hrPending = window.hrPending || [];
+  window.hrPending.unshift(newRecord);
+  // Also add to live loaData immediately
+  if(typeof loaData!=='undefined'&&!loaData.find(r=>r.id===newRecord.id)) loaData.unshift(newRecord);
+  // Re-render HR dashboard table if it exists
+  if(typeof renderTable==='function') renderTable('all');
+  if(typeof renderDashStats==='function') renderDashStats();
+  // Link to current employee so their Leave Status tab updates
+  if(typeof currentEmployee!=='undefined'&&currentEmployee){
+    currentEmployee.loa=newRecord;
+    if(typeof renderEmpLeaveStatus==='function') renderEmpLeaveStatus();
+  }
+  // Show confirmation
+  const rows=[['Employee',`${fn} ${ln}`],['Leave Type',elLeave],['Start Date',fmt(sd)],['Return Date',fmt(ed)],['Department',dept],['Reference #',refId]];
   document.getElementById('empLoaConf').innerHTML=rows.map(([k,v])=>`<div class="conf-item"><div class="ck">${k}</div><div class="cv">${v}</div></div>`).join('');
   document.getElementById('empLoaFormInner').style.display='none';
-  document.getElementById('empLoaSuccess').classList.add('show');
+  const successEl=document.getElementById('empLoaSuccess');
+  successEl.classList.add('show');
+  // Scroll the HR switch banner into view so it's impossible to miss
+  setTimeout(()=>{ successEl.scrollIntoView({behavior:'smooth',block:'start'}); },80);
 }
 function elReset(){
   document.getElementById('empLoaFormInner').style.display='block';
@@ -5267,6 +5334,25 @@ function elReset(){
   document.querySelectorAll('#el-ltGrid .lt-opt').forEach(c=>c.classList.remove('sel'));
   document.getElementById('el-ltInfo').style.display='none';
   elLeave='';
+}
+function switchToHRView(){
+  // Switch directly to HR Admin view without Supabase re-auth — keeps all in-memory data intact
+  document.getElementById('emp-shell').style.display='none';
+  document.getElementById('login-screen').style.display='none';
+  currentEmployee=null;
+  userRole='admin';
+  const shell=document.getElementById('hr-shell');
+  shell.style.display='block';
+  shell.setAttribute('data-role','admin');
+  const badge=document.getElementById('roleBadge');
+  if(badge){badge.textContent='HR Admin';badge.className='role-badge admin';}
+  // Merge pending submissions into loaData before rendering
+  if(window.hrPending&&window.hrPending.length){
+    window.hrPending.forEach(r=>{if(!loaData.find(x=>x.id===r.id))loaData.unshift(r);});
+  }
+  renderTable('all');
+  showView('dashboard');
+  showToast('Switched to HR Admin View','You can now review and approve the submitted leave request.');
 }
 
 // ══ EMPLOYEE DOCUMENT BROWSER ══
