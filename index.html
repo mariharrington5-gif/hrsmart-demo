@@ -476,6 +476,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .esp-active{background:#ecf5ee;color:#166534}
 .esp-leave{background:#fef3c7;color:#92400e}
 .esp-new{background:#eff6ff;color:#1d4ed8}
+.esp-offboarding{background:#fce7f3;color:#9d174d}
 
 /* ══ ANALYTICS ══ */
 .an-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
@@ -2907,7 +2908,7 @@ function renderRoster(data) {
       <td style="font-size:.82rem;color:var(--muted)">${e.manager}</td>
       <td style="font-size:.8rem;color:var(--muted)">${e.start}</td>
       <td><span style="font-size:.73rem;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;${e.empType==='Full-Time'?'background:#EBF5EE;color:#065f46':e.empType==='Part-Time'?'background:#eff6ff;color:#1d4ed8':e.empType==='Seasonal'?'background:#fff7ed;color:#9a3412':'background:#fdf4ff;color:#7e22ce'}">${e.empType||'Full-Time'}</span></td>
-      <td><span class="emp-status-pill ${e.status==='leave'?'esp-leave':e.status==='new'?'esp-new':'esp-active'}">${e.status==='leave'?'On Leave':e.status==='new'?'New Hire':'Active'}</span></td>
+      <td><span class="emp-status-pill ${e.status==='leave'?'esp-leave':e.status==='new'?'esp-new':e.status==='offboarding'?'esp-offboarding':'esp-active'}">${e.status==='leave'?'On Leave':e.status==='new'?'New Hire':e.status==='offboarding'?'Offboarding':'Active'}</span></td>
       <td>
         <div style="display:flex;gap:5px">
           <button class="doc-btn" onclick="editEmployee('${e.id}')">Edit</button>
@@ -3719,6 +3720,17 @@ function closeNewHireModal() {
   const t = document.getElementById('nhEmpType'); if(t) t.value = 'Full-Time';
 }
 
+// ── HEADCOUNT SYNC ──
+// Called after any add/remove to keep KPI cards, roster stats, and analytics in sync
+function syncHeadcountKPIs() {
+  const s = COMPANIES[currentCompany].stats;
+  s.kpiEmp = String(s.empTotal);
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('kpi-total-emp', s.kpiEmp);
+  updateRosterStats();
+  renderAnalytics();
+}
+
 function saveNewHire() {
   const name    = document.getElementById('nhName').value.trim();
   const title   = document.getElementById('nhTitle').value.trim();
@@ -3740,8 +3752,28 @@ function saveNewHire() {
   };
   COMPANIES[currentCompany].onboarding.push(newHire);
   renderOnboarding();
+
+  // ── Add to Employee Roster ──
+  const nameParts = name.trim().split(/\s+/);
+  const first = nameParts[0], last = nameParts.slice(1).join(' ') || '';
+  const newEmpId = 'EMP-' + (1049 + rosterData.length);
+  const co = COMPANIES[currentCompany];
+  const domain = co.name.toLowerCase().includes('meridian') ? 'meridianhealth.com' : 'crestlinemfg.com';
+  rosterData.push({ id:newEmpId, first, last, dept:dept||'General', title, manager:manager||'—', start:startFormatted,
+    email:`${first.toLowerCase()}.${last.toLowerCase()}@${domain}`, status:'new', empType });
+  filterRoster();
+
+  // ── Update headcount stats ──
+  const s = co.stats;
+  s.empTotal = (parseInt(s.empTotal) || 0) + 1;
+  if (empType === 'Full-Time')  s.empFT  = (parseInt(s.empFT)  || 0) + 1;
+  else if (empType === 'Part-Time')  s.empPT  = (parseInt(s.empPT)  || 0) + 1;
+  else if (empType === 'Seasonal')   s.empSea = (parseInt(s.empSea) || 0) + 1;
+  else                               s.empTmp = (parseInt(s.empTmp) || 0) + 1;
+  syncHeadcountKPIs();
+
   closeNewHireModal();
-  showToast('New hire added ✓', `${name} has been added to the onboarding tracker.`);
+  showToast('New hire added ✓', `${name} has been added to the onboarding tracker and employee roster. Headcount updated to ${s.empTotal}.`);
 }
 
 // ── OFFBOARDING ──
@@ -3818,8 +3850,25 @@ function saveDeparture() {
   };
   COMPANIES[currentCompany].offboarding.push(departure);
   renderOffboarding();
+
+  // ── Mark employee in roster as Offboarding ──
+  const nameLower = name.toLowerCase();
+  const rosterMatch = rosterData.find(e => `${e.first} ${e.last}`.toLowerCase() === nameLower);
+  const deptEmpType = rosterMatch ? (rosterMatch.empType || 'Full-Time') : 'Full-Time';
+  if (rosterMatch) rosterMatch.status = 'offboarding';
+  filterRoster();
+
+  // ── Update headcount stats ──
+  const s = COMPANIES[currentCompany].stats;
+  s.empTotal = Math.max(0, (parseInt(s.empTotal) || 0) - 1);
+  if (deptEmpType === 'Full-Time')  s.empFT  = Math.max(0, (parseInt(s.empFT)  || 0) - 1);
+  else if (deptEmpType === 'Part-Time')  s.empPT  = Math.max(0, (parseInt(s.empPT)  || 0) - 1);
+  else if (deptEmpType === 'Seasonal')   s.empSea = Math.max(0, (parseInt(s.empSea) || 0) - 1);
+  else                                   s.empTmp = Math.max(0, (parseInt(s.empTmp) || 0) - 1);
+  syncHeadcountKPIs();
+
   closeDepartureModal();
-  showToast('Departure added ✓', `${name}'s offboarding checklist has been created.`);
+  showToast('Departure added ✓', `${name}'s offboarding checklist has been created and headcount updated to ${s.empTotal}.`);
 }
 
 // ── POLICY NOTIFICATIONS ──
