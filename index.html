@@ -1340,12 +1340,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <label>Message</label>
         <textarea id="emailBody"></textarea>
       </div>
-      <div class="email-field" id="emailFormsSection" style="margin-bottom:12px">
+      <div class="email-field" id="emailFormsSection" style="margin-bottom:8px">
         <label style="display:flex;align-items:center;justify-content:space-between">
           <span>📎 Certification Forms <span style="font-weight:400;color:var(--muted);font-size:.74rem">(check to include in email)</span></span>
           <a id="emailFormsDolLink" href="https://www.dol.gov/agencies/whd/fmla/forms" target="_blank" style="font-size:.72rem;color:var(--teal);text-decoration:none">↗ DOL Forms Library</a>
         </label>
-        <div id="emailFormsList" style="display:flex;flex-direction:column;gap:5px;margin-top:6px"></div>
+        <div id="emailFormsList" style="display:flex;flex-direction:column;gap:3px;margin-top:4px"></div>
       </div>
       <button class="email-send-btn" id="emailSendBtn" onclick="sendFollowupEmail()">📤 Submit for Client Approval</button>
       <div style="text-align:center;font-size:.75rem;color:var(--muted);margin-top:10px">This draft will be sent to the client for review — no email goes out without their approval.</div>
@@ -2104,10 +2104,10 @@ function renderEmailForms(leaveType) {
   const relevant = EMAIL_FORM_LIBRARY.filter(f => f.types.includes(leaveType) || f.id === 'wh381');
   if (!relevant.length) { list.innerHTML = '<div style="font-size:.78rem;color:var(--muted)">No standard forms for this leave type.</div>'; return; }
   list.innerHTML = relevant.map(f => `
-    <div style="display:flex;align-items:center;gap:8px;background:#f0f4fa;border-radius:6px;padding:7px 10px">
-      <input type="checkbox" id="ef-${f.id}" ${f.id===primaryId?'checked':''} onchange="toggleEmailForm('${f.id}')">
-      <label for="ef-${f.id}" style="font-size:.79rem;color:var(--navy);font-weight:500;flex:1;cursor:pointer;line-height:1.3">${f.name}</label>
-      <a href="${f.url}" target="_blank" style="font-size:.72rem;color:var(--teal);text-decoration:none;white-space:nowrap;flex-shrink:0">↗ View</a>
+    <div style="display:flex;align-items:center;gap:6px;background:#f0f4fa;border-radius:5px;padding:4px 8px">
+      <input type="checkbox" id="ef-${f.id}" ${f.id===primaryId?'checked':''} onchange="toggleEmailForm('${f.id}')" style="width:12px;height:12px;flex-shrink:0;margin:0;cursor:pointer">
+      <label for="ef-${f.id}" style="font-size:.74rem;color:var(--navy);font-weight:500;flex:1;cursor:pointer;line-height:1.2">${f.name}</label>
+      <a href="${f.url}" target="_blank" style="font-size:.7rem;color:var(--teal);text-decoration:none;white-space:nowrap;flex-shrink:0">↗</a>
     </div>`).join('');
   // auto-check primary and add to attached list
   const primary = relevant.find(f => f.id === primaryId);
