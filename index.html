@@ -790,8 +790,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="stat s-rose"><div class="stat-icon">🚨</div><div><div class="stat-val" id="stat-loa-urgent">2</div><div class="stat-label">Action Required</div><div class="stat-sub" id="stat-loa-urgent-sub">Overdue certifications</div></div></div>
     </div>
 
-    <!-- CLIENT: Pending Approvals Banner -->
-    <div id="pendingApprovalBanner" class="client-only" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r);padding:16px 20px;margin-bottom:20px;align-items:flex-start;gap:16px;flex-wrap:wrap">
+    <!-- Pending Approvals Banner — visible to both admin (drafts queue) and client (approval queue) -->
+    <div id="pendingApprovalBanner" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r);padding:16px 20px;margin-bottom:20px;align-items:flex-start;gap:16px;flex-wrap:wrap">
       <div style="flex:1;min-width:200px">
         <div style="font-weight:700;font-size:.9rem;color:#92400e;margin-bottom:4px">⏳ Items Pending Your Approval</div>
         <div style="font-size:.82rem;color:#92400e" id="pendingBannerText">You have leave requests and/or email drafts waiting for your review below.</div>
@@ -2040,10 +2040,11 @@ function coCtx() {
 // Called after a new leave is submitted so the 4 stat cards update immediately
 function renderDashStats() {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  set('stat-loa-total',  loaData.length);
-  set('stat-loa-cert',   loaData.filter(r => r.status === 'Awaiting Cert').length);
-  set('stat-loa-active', loaData.filter(r => ['Active','New','Returning'].includes(r.status)).length);
-  set('stat-loa-urgent', loaData.filter(r => r.urgent).length);
+  const active = loaData.filter(r => r.status !== 'Denied' && r.status !== 'Closed');
+  set('stat-loa-total',  active.length);
+  set('stat-loa-cert',   active.filter(r => r.status === 'Awaiting Cert').length);
+  set('stat-loa-active', active.filter(r => ['Active','New','Returning','Approved'].includes(r.status)).length);
+  set('stat-loa-urgent', active.filter(r => r.urgent).length);
 }
 
 // ── VIEW SWITCHING ──
@@ -2306,6 +2307,7 @@ function approveLeave(id) {
     if (approvalStep) approvalStep.note = `Approved by ${COMPANIES[currentCompany].name}`;
   }
   renderTable();
+  renderDashStats();
   // Notify employee portal if this is the logged-in employee's leave
   if (currentEmployee?.loa?.id === id) setEmpLeaveNotification('approved', r);
   if (noCertTypes.includes(r.type)) {
@@ -2323,6 +2325,7 @@ function denyLeave(id) {
   r.sclass = 'sp-denied';
   r.urgent = false;
   renderTable();
+  renderDashStats();
   // Notify employee portal if this is the logged-in employee's leave
   if (currentEmployee?.loa?.id === id) setEmpLeaveNotification('denied', r);
   showToast('Leave Denied', `${r.name}'s leave request has been denied.`, 'warn');
@@ -4146,9 +4149,12 @@ function saveNewHire() {
   // ── Add to Employee Roster ──
   const nameParts = name.trim().split(/\s+/);
   const first = nameParts[0], last = nameParts.slice(1).join(' ') || '';
-  const newEmpId = 'EMP-' + (1049 + rosterData.length);
   const co = COMPANIES[currentCompany];
-  const domain = co.name.toLowerCase().includes('meridian') ? 'meridianhealth.com' : 'crestlinemfg.com';
+  const isMer = co.name.toLowerCase().includes('meridian');
+  const idPrefix = isMer ? 'MHG-' : 'EMP-';
+  const idBase   = isMer ? 2100 : 1049;
+  const newEmpId = idPrefix + (idBase + rosterData.length);
+  const domain = isMer ? 'meridianhealth.com' : 'crestlinemfg.com';
   rosterData.push({ id:newEmpId, first, last, dept:dept||'General', title, manager:manager||'—', start:startFormatted,
     email:`${first.toLowerCase()}.${last.toLowerCase()}@${domain}`, status:'new', empType });
   filterRoster();
