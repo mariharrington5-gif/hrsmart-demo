@@ -1353,6 +1353,25 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- HEADCOUNT REPORT MODAL -->
+<div class="modal-overlay" id="headcountModal" onclick="if(event.target===this)closeHeadcountModal()">
+  <div style="background:#fff;border-radius:var(--r);width:min(820px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.18)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.1rem;color:var(--navy)">📊 Headcount Report</div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:2px" id="hcrSubtitle">Rolling 13-month employee count by type</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="downloadHeadcountCSV()" style="background:var(--navy);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer">⬇ Download CSV</button>
+        <button onclick="closeHeadcountModal()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted);padding:4px 8px">✕</button>
+      </div>
+    </div>
+    <div style="overflow-y:auto;padding:20px 24px">
+      <div id="headcountReportBody"></div>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST CONTAINER -->
 <div class="toast-wrap" id="toastWrap"></div>
 
@@ -1642,18 +1661,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <div class="card-title">👥 Current Employee Roster</div>
-            <button onclick="addEmployee()" style="background:var(--navy);color:#fff;border:none;border-radius:7px;padding:7px 16px;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer">+ Add Employee</button>
+            <div style="display:flex;gap:8px">
+              <button onclick="showHeadcountReport()" style="background:#f0f4fa;color:var(--navy);border:1px solid var(--border);border-radius:7px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer">📊 Headcount Report</button>
+              <button onclick="addEmployee()" style="background:var(--navy);color:#fff;border:none;border-radius:7px;padding:7px 16px;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer">+ Add Employee</button>
+            </div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input type="text" placeholder="Search employees..." id="rosterSearch" oninput="filterRoster()" style="padding:6px 11px;border:1px solid var(--border);border-radius:7px;font-family:'Inter',sans-serif;font-size:.8rem;outline:none;width:180px"/>
             <select id="rosterDeptFilter" onchange="filterRoster()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-family:'Inter',sans-serif;font-size:.79rem;color:var(--text);background:#fff;outline:none">
               <option value="all">All Departments</option>
-              <option value="Engineering">Engineering</option>
-              <option value="Operations">Operations</option>
-              <option value="Product">Product</option>
-              <option value="HR">HR</option>
-              <option value="Logistics">Logistics</option>
-              <option value="Manufacturing">Manufacturing</option>
             </select>
             <select id="rosterTypeFilter" onchange="filterRoster()" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-family:'Inter',sans-serif;font-size:.79rem;color:var(--text);background:#fff;outline:none">
               <option value="all">All Employment Types</option>
@@ -2290,6 +2306,8 @@ function approveLeave(id) {
     if (approvalStep) approvalStep.note = `Approved by ${COMPANIES[currentCompany].name}`;
   }
   renderTable();
+  // Notify employee portal if this is the logged-in employee's leave
+  if (currentEmployee?.loa?.id === id) setEmpLeaveNotification('approved', r);
   if (noCertTypes.includes(r.type)) {
     showToast('Leave Approved ✓', `${r.name}'s ${r.type} has been approved. No certification required.`);
   } else {
@@ -2305,6 +2323,8 @@ function denyLeave(id) {
   r.sclass = 'sp-denied';
   r.urgent = false;
   renderTable();
+  // Notify employee portal if this is the logged-in employee's leave
+  if (currentEmployee?.loa?.id === id) setEmpLeaveNotification('denied', r);
   showToast('Leave Denied', `${r.name}'s leave request has been denied.`, 'warn');
 }
 
@@ -3430,6 +3450,18 @@ const COMPANIES = {
       {id:'MHG-2046',first:'Marcus',last:'Johnson',dept:'Clinical',title:'Care Coordinator',manager:'Dr. Raj Patel',start:'Nov 5, 2021',email:'marcus.johnson@meridianhealth.com',status:'leave',empType:'Full-Time'},
       {id:'MHG-2047',first:'Linda',last:'Park',dept:'Administration',title:'Practice Manager',manager:'CEO',start:'Apr 15, 2018',email:'linda.park@meridianhealth.com',status:'leave',empType:'Full-Time'},
       {id:'MHG-2048',first:'Carlos',last:'Rivera',dept:'Clinical',title:'Medical Assistant',manager:'Dr. Elena Voss',start:'Jul 8, 2022',email:'carlos.rivera@meridianhealth.com',status:'leave',empType:'Seasonal'},
+      {id:'MHG-2011',first:'Elena',last:'Voss',dept:'Nursing',title:'Nursing Director',manager:'CEO',start:'Mar 1, 2017',email:'elena.voss@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2012',first:'Raj',last:'Patel',dept:'Clinical',title:'Medical Director',manager:'CEO',start:'Jun 10, 2016',email:'raj.patel@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2013',first:'Angela',last:'Wong',dept:'Laboratory',title:'Lab Director',manager:'CEO',start:'Aug 22, 2018',email:'angela.wong@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2014',first:'Thomas',last:'Nguyen',dept:'Nursing',title:'Charge Nurse',manager:'Dr. Elena Voss',start:'Feb 14, 2020',email:'thomas.nguyen@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2015',first:'Amara',last:'Osei',dept:'Nursing',title:'LVN',manager:'Dr. Elena Voss',start:'Jan 7, 2022',email:'amara.osei@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2016',first:'Kevin',last:'Walsh',dept:'Billing',title:'Billing Manager',manager:'Linda Park',start:'Oct 3, 2019',email:'kevin.walsh@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2017',first:'Tanya',last:'Reyes',dept:'Administration',title:'Front Desk Lead',manager:'Linda Park',start:'May 18, 2021',email:'tanya.reyes@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2018',first:'Dante',last:'Mills',dept:'Clinical',title:'Patient Coordinator',manager:'Dr. Raj Patel',start:'Mar 30, 2023',email:'dante.mills@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2019',first:'Yuki',last:'Sato',dept:'Pharmacy',title:'Pharmacist',manager:'CEO',start:'Sep 12, 2020',email:'yuki.sato@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2020',first:'Omar',last:'Hassan',dept:'Pharmacy',title:'Pharmacy Technician',manager:'Yuki Sato',start:'Apr 5, 2022',email:'omar.hassan@meridianhealth.com',status:'active',empType:'Full-Time'},
+      {id:'MHG-2021',first:'Grace',last:'Lee',dept:'Laboratory',title:'Phlebotomist',manager:'Dr. Angela Wong',start:'Jul 19, 2023',email:'grace.lee@meridianhealth.com',status:'active',empType:'Part-Time'},
+      {id:'MHG-2022',first:'Ivan',last:'Petrov',dept:'Administration',title:'Medical Receptionist',manager:'Linda Park',start:'Nov 1, 2023',email:'ivan.petrov@meridianhealth.com',status:'active',empType:'Part-Time'},
     ],
     empDir:{
       'sofia ramirez|mhg-2041':'LOA-2041','james kim|mhg-2042':'LOA-2042','rachel torres|mhg-2043':'LOA-2043',
@@ -3567,6 +3599,8 @@ function loadCompany(id) {
   leaveHistoryData = co.leaveHistory || [];
   // apply module visibility
   applyModules(id);
+  // refresh roster dept dropdown for this company
+  updateRosterDeptFilter(co);
   // re-render all data-dependent UI
   renderTable();
   renderTypeChart();
@@ -3904,6 +3938,176 @@ function renderFormerEmployees() {
       </tbody>
     </table>
     <div style="font-size:.75rem;color:var(--muted);padding:8px 16px">${data.length} former employee${data.length!==1?'s':''} on record</div>`;
+}
+
+// ── ROSTER DEPT FILTER — dynamic per company ──
+function updateRosterDeptFilter(co) {
+  const sel = document.getElementById('rosterDeptFilter');
+  if (!sel) return;
+  const depts = (co.depts || []).map(d => d.name);
+  // also collect any dept names from roster not in depts array
+  const rosterDepts = [...new Set((co.roster || []).map(e => e.dept))];
+  const all = [...new Set([...depts, ...rosterDepts])].sort();
+  sel.innerHTML = '<option value="all">All Departments</option>' +
+    all.map(d => `<option value="${d}">${d}</option>`).join('');
+}
+
+// ── HEADCOUNT REPORT ──
+let _hcrData = []; // stored for CSV download
+
+function showHeadcountReport() {
+  const co    = COMPANIES[currentCompany];
+  const modal = document.getElementById('headcountModal');
+  const body  = document.getElementById('headcountReportBody');
+  const sub   = document.getElementById('hcrSubtitle');
+  if (!modal || !body) return;
+
+  // Parse dates like "Mar 15, 2023" or "Jan 31, 2026" or ISO strings
+  const parseDate = s => {
+    if (!s || s === '—') return null;
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  };
+
+  // Build full employee list: active + former
+  const active = (co.roster || []).map(e => ({
+    name: `${e.first} ${e.last}`, type: e.empType || 'Full-Time',
+    start: parseDate(e.start), departed: null,
+  }));
+  const former = (co.formerEmployees || []).map(e => ({
+    name: `${e.first} ${e.last}`, type: e.empType || 'Full-Time',
+    start: parseDate(e.start), departed: parseDate(e.departed),
+  }));
+  const all = [...active, ...former];
+
+  // Generate last 13 months (oldest → newest)
+  const rows = [];
+  const now  = new Date();
+  for (let i = 12; i >= 0; i--) {
+    const d      = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
+    const mEnd   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+    const label  = d.toLocaleString('en-US', {month:'short', year:'numeric'});
+    let total=0, ft=0, pt=0, sea=0, tmp=0, depart=0;
+    all.forEach(e => {
+      const s = e.start, dep = e.departed;
+      const activeInMonth = s && s <= mEnd && (!dep || dep >= mStart);
+      if (!activeInMonth) return;
+      total++;
+      if      (e.type === 'Full-Time') ft++;
+      else if (e.type === 'Part-Time') pt++;
+      else if (e.type === 'Seasonal')  sea++;
+      else                             tmp++;
+      if (dep && dep >= mStart && dep <= mEnd) depart++;
+    });
+    rows.push({label, total, ft, pt, sea, tmp, depart});
+  }
+  _hcrData = rows;
+
+  // Use company-level stats for current month's total (more accurate than roster slice)
+  const s = co.stats;
+  if (rows.length && s.empTotal) {
+    const last = rows[rows.length - 1];
+    const ratio = s.empTotal / Math.max(1, last.total);
+    if (ratio > 2) {
+      // roster is a sample — scale all months proportionally for display
+      rows.forEach(r => {
+        r.total = Math.round(r.total * ratio);
+        r.ft    = Math.round(r.ft    * ratio);
+        r.pt    = Math.round(r.pt    * ratio);
+        r.sea   = Math.round(r.sea   * ratio);
+        r.tmp   = Math.round(r.tmp   * ratio);
+      });
+      // pin current month to actual stats
+      const cur = rows[rows.length - 1];
+      cur.total = s.empTotal; cur.ft = s.empFT||cur.ft; cur.pt = s.empPT||cur.pt;
+      cur.sea   = s.empSea||cur.sea; cur.tmp = s.empTmp||cur.tmp;
+    }
+  }
+
+  sub.textContent = `${co.name} · Rolling 13-month employee count by type`;
+
+  const maxTotal = Math.max(...rows.map(r => r.total), 1);
+  body.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+      <thead>
+        <tr style="background:#f8fafc">
+          <th style="text-align:left;padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border)">Month</th>
+          <th style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border);text-align:right">Total</th>
+          <th style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border);text-align:right">Full-Time</th>
+          <th style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border);text-align:right">Part-Time</th>
+          <th style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border);text-align:right">Seasonal</th>
+          <th style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border);text-align:right">Temp</th>
+          <th style="padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border);text-align:right">Departures</th>
+          <th style="padding:8px 18px 8px 8px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--border)">Trend</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r, idx) => {
+          const isCurrent = idx === rows.length - 1;
+          const prev = idx > 0 ? rows[idx-1].total : r.total;
+          const delta = r.total - prev;
+          const deltaStr = delta > 0 ? `<span style="color:#16a34a">▲${delta}</span>` : delta < 0 ? `<span style="color:#dc2626">▼${Math.abs(delta)}</span>` : '<span style="color:#94a3b8">—</span>';
+          const barW = Math.round(r.total / maxTotal * 100);
+          return `<tr style="${isCurrent?'background:#f0f9ff;font-weight:600':''}">
+            <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;color:var(--navy);font-weight:${isCurrent?700:500}">${r.label}${isCurrent?' <span style="font-size:.68rem;background:#1a56c4;color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px">Current</span>':''}</td>
+            <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;color:var(--navy)">${r.total}</td>
+            <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:right;color:#374151">${r.ft}</td>
+            <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:right;color:#374151">${r.pt}</td>
+            <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:right;color:#374151">${r.sea}</td>
+            <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:right;color:#374151">${r.tmp}</td>
+            <td style="padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:right;color:${r.depart>0?'#dc2626':'#94a3b8'}">${r.depart||'—'}</td>
+            <td style="padding:9px 18px 9px 8px;border-bottom:1px solid #f1f5f9">
+              <div style="display:flex;align-items:center;gap:6px">
+                <div style="flex:1;height:6px;background:#f1f5f9;border-radius:3px;min-width:60px"><div style="width:${barW}%;height:6px;background:var(--navy);border-radius:3px;opacity:${isCurrent?1:.65}"></div></div>
+                <span style="font-size:.75rem;min-width:28px">${deltaStr}</span>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:.73rem;color:var(--muted);margin-top:12px;padding:10px 12px;background:#fafafa;border-radius:6px;border:1px solid var(--border)">
+      ℹ️ Counts are derived from active roster and departure records. Trend deltas reflect month-over-month change in total headcount.
+    </div>`;
+
+  modal.classList.add('open');
+}
+
+function closeHeadcountModal() {
+  document.getElementById('headcountModal')?.classList.remove('open');
+}
+
+function downloadHeadcountCSV() {
+  if (!_hcrData.length) return;
+  const co = COMPANIES[currentCompany];
+  const header = ['Month','Total','Full-Time','Part-Time','Seasonal','Temp','Departures'];
+  const rows   = _hcrData.map(r => [r.label, r.total, r.ft, r.pt, r.sea, r.tmp, r.depart]);
+  const csv    = [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob   = new Blob([csv], {type:'text/csv'});
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href = url;
+  a.download = `${(co.name||'Company').replace(/\s+/g,'-')}-Headcount-Report.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV Downloaded ✓', 'Headcount report saved to your downloads folder.');
+}
+
+// ── EMPLOYEE LEAVE NOTIFICATIONS ──
+let empLeaveNotification = null; // {status:'approved'|'denied', caseId, name}
+
+function setEmpLeaveNotification(status, record) {
+  empLeaveNotification = {status, caseId: record.id, name: record.name, type: record.type};
+  // Show red dot on My Leave tab
+  const dot = document.getElementById('leaveNotifDot');
+  if (dot) { dot.style.display = 'inline-block'; dot.style.setProperty('display','inline-block','important'); }
+}
+
+function clearEmpLeaveNotification() {
+  empLeaveNotification = null;
+  const dot = document.getElementById('leaveNotifDot');
+  if (dot) dot.style.display = 'none';
 }
 
 // ── HEADCOUNT SYNC ──
@@ -5062,7 +5266,7 @@ function eaSubmitAssess(){
     <div class="emp-welcome" id="empWelcome">Welcome back 👋</div>
     <nav class="emp-nav">
       <button class="emp-tnav active" onclick="empTab('benefits',this)">💊 My Benefits</button>
-      <button class="emp-tnav" onclick="empTab('mystatus',this)" id="myLeaveTab">📋 My Leave</button>
+      <button class="emp-tnav" onclick="empTab('mystatus',this)" id="myLeaveTab">📋 My Leave<span id="leaveNotifDot" style="display:none;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-left:5px;flex-shrink:0;display:none"></span></button>
       <button class="emp-tnav" onclick="empTab('ask',this)">💬 Ask HR</button>
       <button class="emp-tnav" onclick="empTab('leave',this)">➕ Request Leave</button>
       <button class="emp-tnav" onclick="empTab('docs',this)">📁 Documents</button>
@@ -5384,6 +5588,7 @@ async function logout() {
   currentEmployee = null;
   userRole = 'admin';
   currentSessionName = '';
+  empLeaveNotification = null;
   window.hrPending = [];
   window.savedEmployee = null;
   window.savedEmpLoa = null;
@@ -5428,9 +5633,25 @@ function renderEmpLeaveStatus() {
   if (!container) return;
   const r = currentEmployee && currentEmployee.loa;
 
+  // Show notification banner if leave status just changed
+  let notifBanner = '';
+  if (empLeaveNotification) {
+    const isApproved = empLeaveNotification.status === 'approved';
+    notifBanner = `
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:var(--r);border:1px solid ${isApproved?'#bbf7d0':'#fecaca'};background:${isApproved?'#f0fdf4':'#fef2f2'};margin-bottom:18px">
+        <div style="font-size:1.8rem">${isApproved?'✅':'❌'}</div>
+        <div>
+          <div style="font-weight:700;color:${isApproved?'#15803d':'#dc2626'};font-size:.95rem;margin-bottom:2px">${isApproved?'Your leave has been approved!':'Your leave request was not approved.'}</div>
+          <div style="font-size:.82rem;color:${isApproved?'#166534':'#991b1b'}">${isApproved?`${empLeaveNotification.type} leave — see timeline and next steps below.`:`Contact HR at ${coCtx().email} if you have questions.`}</div>
+        </div>
+        <button onclick="clearEmpLeaveNotification();renderEmpLeaveStatus()" style="margin-left:auto;background:none;border:none;font-size:1rem;cursor:pointer;color:#94a3b8;padding:4px">✕</button>
+      </div>`;
+    clearEmpLeaveNotification();
+  }
+
   if (!r) {
     // No active leave
-    container.innerHTML = `
+    container.innerHTML = notifBanner + `
       <div class="loa-status-hero no-leave" style="display:flex;align-items:center;gap:20px">
         <div style="font-size:3rem">✅</div>
         <div class="loa-status-detail">
@@ -5483,7 +5704,7 @@ function renderEmpLeaveStatus() {
   const completedSteps = r.timeline.filter(t => t.done).length;
   const totalSteps = r.timeline.length;
 
-  container.innerHTML = `
+  container.innerHTML = notifBanner + `
     <div class="loa-status-hero active-leave" style="display:flex;align-items:center;gap:22px">
       <div class="loa-days-ring">
         <svg width="90" height="90" viewBox="0 0 90 90">
