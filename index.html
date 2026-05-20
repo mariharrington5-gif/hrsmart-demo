@@ -734,8 +734,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Full platform access — AI tools, settings, all controls.</div>
       <!-- Demo quick-access (no Supabase needed) -->
       <div style="background:#f0f4fa;border-radius:8px;padding:12px 14px;margin-bottom:14px;border:1px solid #c7d7f0">
-        <div style="font-size:.75rem;font-weight:700;color:#1a56c4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⚡ Demo Quick Access</div>
-        <button class="emp-login-btn" style="background:var(--navy);margin-bottom:0" onclick="finishLogin('admin','Crestline')">Enter as HR Admin — Crestline Manufacturing →</button>
+        <div style="font-size:.75rem;font-weight:700;color:#1a56c4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⚡ Demo Quick Access — HR Admin</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="emp-login-btn" style="background:var(--navy);font-size:.82rem;padding:11px 8px;margin-bottom:0;line-height:1.4" onclick="finishLogin('admin','Crestline')">⚡ HR Admin<br><span style="font-size:.73rem;font-weight:400;opacity:.85">Crestline Mfg.</span></button>
+          <button class="emp-login-btn" style="background:var(--navy2);font-size:.82rem;padding:11px 8px;margin-bottom:0;line-height:1.4" onclick="finishLogin('admin','meridian')">🏥 HR Admin<br><span style="font-size:.73rem;font-weight:400;opacity:.85">Meridian Health</span></button>
+        </div>
       </div>
       <div style="text-align:center;font-size:.75rem;color:var(--muted);margin-bottom:10px">— or sign in with credentials —</div>
       <input class="emp-login-input" id="hrLoginUser" type="text" placeholder="Admin email" onkeydown="if(event.key==='Enter')loginAs('admin')"/>
@@ -1337,8 +1340,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <label>Message</label>
         <textarea id="emailBody"></textarea>
       </div>
-      <button class="email-send-btn" id="emailSendBtn" onclick="sendFollowupEmail()">📨 Send Email &amp; Notify HR</button>
-      <div style="text-align:center;font-size:.75rem;color:var(--muted);margin-top:10px">HR will receive an automatic notification confirming this email was sent.</div>
+      <div class="email-field" id="emailFormsSection" style="margin-bottom:12px">
+        <label style="display:flex;align-items:center;justify-content:space-between">
+          <span>📎 Certification Forms <span style="font-weight:400;color:var(--muted);font-size:.74rem">(check to include in email)</span></span>
+          <a id="emailFormsDolLink" href="https://www.dol.gov/agencies/whd/fmla/forms" target="_blank" style="font-size:.72rem;color:var(--teal);text-decoration:none">↗ DOL Forms Library</a>
+        </label>
+        <div id="emailFormsList" style="display:flex;flex-direction:column;gap:5px;margin-top:6px"></div>
+      </div>
+      <button class="email-send-btn" id="emailSendBtn" onclick="sendFollowupEmail()">📤 Submit for Client Approval</button>
+      <div style="text-align:center;font-size:.75rem;color:var(--muted);margin-top:10px">This draft will be sent to the client for review — no email goes out without their approval.</div>
     </div>
   </div>
 </div>
@@ -2074,6 +2084,44 @@ function setEmailType(type, label) {
   document.getElementById('emailSubject').value = tmpl.subj;
   document.getElementById('emailBody').value = tmpl.body;
 }
+// ── EMAIL FORM ATTACHMENTS ──
+let emailAttachedForms = []; // forms selected to accompany the current email draft
+const EMAIL_FORM_LIBRARY = [
+  {id:'wh380e', name:'WH-380-E — Employee Health Condition (FMLA)', url:'https://www.dol.gov/sites/dolgov/files/WHD/legacy/files/wh380E.pdf',  types:['FMLA/CFRA','Personal Leave','Other']},
+  {id:'wh380f', name:'WH-380-F — Family Member Health Condition (FMLA)', url:'https://www.dol.gov/sites/dolgov/files/WHD/legacy/files/wh380F.pdf', types:['Baby Bonding']},
+  {id:'wh381',  name:'WH-381 — Notice of Eligibility & Rights',   url:'https://www.dol.gov/sites/dolgov/files/WHD/legacy/files/WH-381.pdf',   types:['FMLA/CFRA','Pregnancy Disability','Baby Bonding','Personal Leave']},
+  {id:'wh382',  name:'WH-382 — FMLA Designation Notice',          url:'https://www.dol.gov/sites/dolgov/files/WHD/legacy/files/WH-382.pdf',   types:['FMLA/CFRA']},
+  {id:'dfeh',   name:'DFEH-100-21 — CA Pregnancy Disability Leave Cert', url:'https://calcivilrights.ca.gov/wp-content/uploads/sites/32/2022/11/DFEH-100-21-ENG.pdf', types:['Pregnancy Disability']},
+  {id:'cfra2',  name:'CFRA-2 — Baby Bonding Certification',        url:'https://calcivilrights.ca.gov/wp-content/uploads/sites/32/2023/03/CFRA-Baby-Bonding.pdf',    types:['Baby Bonding']},
+];
+const EMAIL_FORM_PRIMARY = {'FMLA/CFRA':'wh380e','Pregnancy Disability':'dfeh','Baby Bonding':'wh380f'};
+
+function renderEmailForms(leaveType) {
+  const list = document.getElementById('emailFormsList');
+  if (!list) return;
+  emailAttachedForms = [];
+  const primaryId = EMAIL_FORM_PRIMARY[leaveType] || 'wh380e';
+  const relevant = EMAIL_FORM_LIBRARY.filter(f => f.types.includes(leaveType) || f.id === 'wh381');
+  if (!relevant.length) { list.innerHTML = '<div style="font-size:.78rem;color:var(--muted)">No standard forms for this leave type.</div>'; return; }
+  list.innerHTML = relevant.map(f => `
+    <div style="display:flex;align-items:center;gap:8px;background:#f0f4fa;border-radius:6px;padding:7px 10px">
+      <input type="checkbox" id="ef-${f.id}" ${f.id===primaryId?'checked':''} onchange="toggleEmailForm('${f.id}')">
+      <label for="ef-${f.id}" style="font-size:.79rem;color:var(--navy);font-weight:500;flex:1;cursor:pointer;line-height:1.3">${f.name}</label>
+      <a href="${f.url}" target="_blank" style="font-size:.72rem;color:var(--teal);text-decoration:none;white-space:nowrap;flex-shrink:0">↗ View</a>
+    </div>`).join('');
+  // auto-check primary and add to attached list
+  const primary = relevant.find(f => f.id === primaryId);
+  if (primary) emailAttachedForms.push(primary);
+}
+
+function toggleEmailForm(id) {
+  const f = EMAIL_FORM_LIBRARY.find(x => x.id === id);
+  if (!f) return;
+  const checked = document.getElementById('ef-' + id)?.checked;
+  if (checked) { emailAttachedForms.push(f); }
+  else { emailAttachedForms = emailAttachedForms.filter(x => x.id !== id); }
+}
+
 function openEmailModal(id) {
   emailCaseId = id;
   const r = loaData.find(x=>x.id===id);
@@ -2086,39 +2134,57 @@ function openEmailModal(id) {
   document.getElementById('emailBody').value = tmpl.body;
   currentEmailType = 'cert';
   document.querySelectorAll('.email-type-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+  renderEmailForms(r.type); // populate form checkboxes for this leave type
   document.getElementById('emailModal').classList.add('open');
 }
+
 function closeEmailModal(){document.getElementById('emailModal').classList.remove('open');}
+
 function sendFollowupEmail(){
-  const btn=document.getElementById('emailSendBtn');
-  const to=document.getElementById('emailTo').value;
-  const subj=document.getElementById('emailSubject').value;
-  if(!to||!subj){showToast('Missing fields','Please fill in To and Subject fields.','warn');return;}
-  btn.disabled=true;btn.textContent='⏳ Sending...';
-  setTimeout(()=>{
-    btn.disabled=false;
-    btn.innerHTML='📨 Send Email &amp; Notify HR';
+  // Task 3: route through client approval queue — no email goes out without client sign-off
+  const btn = document.getElementById('emailSendBtn');
+  const to   = document.getElementById('emailTo').value;
+  const subj = document.getElementById('emailSubject').value;
+  const body = document.getElementById('emailBody').value;
+  if (!to || !subj) { showToast('Missing fields','Please fill in To and Subject fields.','warn'); return; }
+  btn.disabled = true; btn.textContent = '⏳ Submitting…';
+  setTimeout(() => {
+    btn.disabled = false; btn.innerHTML = '📤 Submit for Client Approval';
+    const r = loaData.find(x => x.id === emailCaseId);
+    const empName = r ? r.name : 'Employee';
+    const typeLabel = {'cert':'Missing Certification','info':'Missing Information','return':'Return-to-Work Form','reminder':'General Reminder'}[currentEmailType] || 'Follow-up';
+    const formNames = emailAttachedForms.map(f => f.name).join('; ');
+    const preview = body.substring(0, 160) + (body.length > 160 ? '…' : '');
+    pendingEmailApprovals.push({
+      subject: subj,
+      preview: preview,
+      formsNote: formNames ? `📎 Forms attached: ${formNames}` : '',
+      attachedForms: [...emailAttachedForms],
+      name: empName,
+      type: typeLabel,
+      caseId: emailCaseId,
+    });
+    renderPendingEmails();
     closeEmailModal();
-    const r=loaData.find(x=>x.id===emailCaseId);
-    const typeLabel={'cert':'Missing Certification','info':'Missing Information','return':'Return-to-Work Form','reminder':'General Reminder'}[currentEmailType]||'Follow-up';
-    addEmailLog(r?r.name:'Employee', typeLabel, emailCaseId);
-    showToast('Email sent successfully','HR has been notified. Entry added to email log.');
-  },1200);
+    showToast('Draft Submitted for Approval 📤', `This email draft is now pending ${COMPANIES[currentCompany]?.name || 'client'} approval before it goes out.`);
+  }, 900);
 }
 let emailLogEntries=[];
-function addEmailLog(name,type,caseId){
-  const now=new Date();
-  const time=now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-  emailLogEntries.unshift({name,type,caseId,time,hrEmail:coCtx().email});
-  const list=document.getElementById('emailLogList');
-  const count=document.getElementById('emailLogCount');
-  count.textContent=`${emailLogEntries.length} sent today`;
-  list.innerHTML=emailLogEntries.map(e=>`
+function addEmailLog(name, type, caseId, attachedForms=[]) {
+  const now  = new Date();
+  const time = now.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  emailLogEntries.unshift({name, type, caseId, time, hrEmail: coCtx().email, attachedForms});
+  const list  = document.getElementById('emailLogList');
+  const count = document.getElementById('emailLogCount');
+  if (count) count.textContent = `${emailLogEntries.length} sent today`;
+  if (!list) return;
+  list.innerHTML = emailLogEntries.map(e => `
     <div class="email-log-item">
       <div class="el-dot"></div>
       <div style="flex:1">
         <div class="el-name">${e.name} <span style="font-weight:400;color:var(--muted)">· ${e.caseId}</span></div>
-        <div class="el-desc">${e.type} email sent · CC: ${e.hrEmail||'hr@crestlinemfg.com'}</div>
+        <div class="el-desc">${e.type} · Approved &amp; sent · CC: ${e.hrEmail || 'hr@crestlinemfg.com'}</div>
+        ${e.attachedForms && e.attachedForms.length ? `<div style="font-size:.72rem;color:#1a56c4;margin-top:2px">📎 ${e.attachedForms.map(f=>f.name).join(' · ')}</div>` : ''}
       </div>
       <div class="el-time">${e.time}</div>
     </div>`).join('');
@@ -2126,6 +2192,7 @@ function addEmailLog(name,type,caseId){
 
 // ── ROLE ──
 let userRole = 'admin';
+let currentSessionName = ''; // tracks who is logged in for approval audit trails
 
 // ── PENDING EMPLOYEE SUBMISSIONS (never reset, survives loadCompany) ──
 window.hrPending = window.hrPending || [];
@@ -2206,7 +2273,8 @@ function approveLeave(id) {
   r.sclass = 'sp-approved';
   r.urgent = false;
   r.certApproved = !noCertTypes.includes(r.type);
-  r.approvedBy = COMPANIES[currentCompany].name;
+  const approverLabel = currentSessionName || (userRole === 'client' ? COMPANIES[currentCompany].name + ' (Client)' : 'HR Smart Admin');
+  r.approvedBy = approverLabel;
   r.approvedAt = ts;
   r.confirmedBy = 'HR Smart';
   // Mark all pending timeline steps as complete so employee portal is consistent
@@ -2255,11 +2323,13 @@ function renderPendingEmails() {
   document.getElementById('pendingBannerText').textContent =
     `You have ${pendingEmailApprovals.length} email draft${pendingEmailApprovals.length>1?'s':''} from your HR advisor waiting for your approval.`;
   actionsEl.innerHTML = pendingEmailApprovals.map((e,i) =>
-    `<div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:.82rem;max-width:340px">
+    `<div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:.82rem;max-width:380px">
       <div style="font-weight:600;color:var(--navy);margin-bottom:4px">📧 ${e.subject}</div>
-      <div style="color:var(--muted);font-size:.77rem;margin-bottom:10px;white-space:pre-wrap">${e.preview}</div>
+      <div style="font-size:.74rem;color:var(--muted);margin-bottom:4px">To: ${e.name} · ${e.type}</div>
+      <div style="color:var(--muted);font-size:.77rem;margin-bottom:6px;white-space:pre-wrap;line-height:1.45">${e.preview}</div>
+      ${e.formsNote ? `<div style="font-size:.74rem;color:#1a56c4;background:#f0f4fa;border-radius:5px;padding:5px 8px;margin-bottom:8px">${e.formsNote}</div>` : ''}
       <div style="display:flex;gap:6px">
-        <button class="approve-btn" onclick="approveEmail(${i})">✓ Approve & Send</button>
+        <button class="approve-btn" onclick="approveEmail(${i})">✓ Approve &amp; Send</button>
         <button class="deny-btn" onclick="rejectEmail(${i})">Request Changes</button>
       </div>
     </div>`
@@ -2269,9 +2339,9 @@ function renderPendingEmails() {
 function approveEmail(i) {
   const e = pendingEmailApprovals[i];
   pendingEmailApprovals.splice(i, 1);
-  addEmailLog(e.name, e.type, e.caseId);
+  addEmailLog(e.name, e.type, e.caseId, e.attachedForms || []);
   renderPendingEmails();
-  showToast('Email Approved ✓', 'The email draft has been approved and logged.');
+  showToast('Email Approved & Sent ✓', `"${e.subject}" has been approved and sent to ${e.name}.`);
 }
 
 function rejectEmail(i) {
@@ -5252,6 +5322,9 @@ async function loginAs(role) {
 
   if (error) { showToast('Login failed', error.message, 'error'); return; }
 
+  // capture who logged in for approval audit trails
+  currentSessionName = data.user.email || '';
+
   // load profile to get role + company
   const { data: profile, error: pErr } = await _sb.from('profiles').select('role, company').eq('id', data.user.id).single();
   if (pErr || !profile) {
@@ -5276,6 +5349,11 @@ function finishLogin(role, company) {
   // Safety: if company key still not found, fall back to first available
   const safeCompany = COMPANIES[resolvedCompany] ? resolvedCompany : Object.keys(COMPANIES)[0];
   loadCompany(safeCompany);
+  // Set demo session name if not already set via Supabase loginAs()
+  if (!currentSessionName) {
+    const coName = COMPANIES[safeCompany]?.name || safeCompany;
+    currentSessionName = role === 'admin' ? 'HR Smart (Demo Admin)' : coName + ' (Client Portal)';
+  }
   document.getElementById('login-screen').style.display = 'none';
   const shell = document.getElementById('hr-shell');
   shell.style.display = 'block';
@@ -5293,6 +5371,7 @@ async function logout() {
   // clear all session state
   currentEmployee = null;
   userRole = 'admin';
+  currentSessionName = '';
   window.hrPending = [];
   window.savedEmployee = null;
   window.savedEmpLoa = null;
