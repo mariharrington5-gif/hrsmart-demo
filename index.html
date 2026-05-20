@@ -730,11 +730,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div id="loginAdminPane" style="display:none">
       <div style="font-size:1.6rem;margin-bottom:8px">🔒</div>
       <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.05rem;color:var(--navy);margin-bottom:4px">HR Admin Access</div>
-      <div style="font-size:.82rem;color:var(--muted);margin-bottom:20px">Full platform access — AI tools, settings, all controls.</div>
-      <input class="emp-login-input" id="hrLoginUser" type="text" placeholder="Admin username" onkeydown="if(event.key==='Enter')loginAs('admin')"/>
+      <div style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Full platform access — AI tools, settings, all controls.</div>
+      <!-- Demo quick-access (no Supabase needed) -->
+      <div style="background:#f0f4fa;border-radius:8px;padding:12px 14px;margin-bottom:14px;border:1px solid #c7d7f0">
+        <div style="font-size:.75rem;font-weight:700;color:#1a56c4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⚡ Demo Quick Access</div>
+        <button class="emp-login-btn" style="background:var(--navy);margin-bottom:0" onclick="finishLogin('admin','Crestline')">Enter as HR Admin — Crestline Manufacturing →</button>
+      </div>
+      <div style="text-align:center;font-size:.75rem;color:var(--muted);margin-bottom:10px">— or sign in with credentials —</div>
+      <input class="emp-login-input" id="hrLoginUser" type="text" placeholder="Admin email" onkeydown="if(event.key==='Enter')loginAs('admin')"/>
       <input class="emp-login-input" id="hrLoginPass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')loginAs('admin')"/>
-      <button class="emp-login-btn" onclick="loginAs('admin')">Sign In as HR Admin →</button>
-      <div class="login-demo-hint" style="margin-top:10px">Demo: any credentials will work.</div>
+      <button class="emp-login-btn" style="background:var(--navy2)" onclick="loginAs('admin')">Sign In with Supabase →</button>
     </div>
 
     <div style="text-align:center;margin-top:14px">
@@ -5097,7 +5102,12 @@ async function loginAs(role) {
 
 function finishLogin(role, company) {
   userRole = role;
-  loadCompany(company || 'Crestline');
+  // Normalize legacy/old company keys to current keys
+  const companyNorm = {'Endera':'Crestline','endera':'Crestline','endera motors':'Crestline'};
+  const resolvedCompany = companyNorm[company] || company || 'Crestline';
+  // Safety: if company key still not found, fall back to first available
+  const safeCompany = COMPANIES[resolvedCompany] ? resolvedCompany : Object.keys(COMPANIES)[0];
+  loadCompany(safeCompany);
   document.getElementById('login-screen').style.display = 'none';
   const shell = document.getElementById('hr-shell');
   shell.style.display = 'block';
