@@ -1327,7 +1327,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div class="email-field">
         <label>CC (HR Manager)</label>
-        <input type="email" id="emailCC" value="hr@crestlinemfg.com"/>
+        <input type="email" id="emailCC" value="hr@crestlinemfg.com"/><!-- populated dynamically in openEmailModal() -->
       </div>
       <div class="email-field">
         <label>Subject</label>
@@ -1997,6 +1997,29 @@ function apiHeaders() {
   return h;
 }
 
+// ── COMPANY CONTEXT HELPER ──
+// Returns company-specific contact info — used in emails, templates, and UI strings
+function coCtx() {
+  const co = COMPANIES[currentCompany] || COMPANIES.Crestline;
+  const isMeridian = co.name.toLowerCase().includes('meridian');
+  return {
+    name:   co.name,
+    email:  isMeridian ? 'hr@meridianhealth.com'  : 'hr@crestlinemfg.com',
+    domain: isMeridian ? 'meridianhealth.com'      : 'crestlinemfg.com',
+    phone:  isMeridian ? '(555) 876-5432'          : '(555) 234-5678',
+  };
+}
+
+// ── LOA DASHBOARD STAT REFRESH ──
+// Called after a new leave is submitted so the 4 stat cards update immediately
+function renderDashStats() {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('stat-loa-total',  loaData.length);
+  set('stat-loa-cert',   loaData.filter(r => r.status === 'Awaiting Cert').length);
+  set('stat-loa-active', loaData.filter(r => ['Active','New','Returning'].includes(r.status)).length);
+  set('stat-loa-urgent', loaData.filter(r => r.urgent).length);
+}
+
 // ── VIEW SWITCHING ──
 const VIEW_ORDER = ['analytics','dashboard','employee','assessments','compliance','onboarding','offboarding','admin'];
 function showView(v) {
@@ -2023,22 +2046,22 @@ function showToast(msg, sub, type='') {
 // ── EMAIL MODAL ──
 let emailCaseId = '';
 const emailTemplates = {
-  cert: (name,caseId)=>({
-    subj:`Action Required: Medical Certification Needed — ${caseId}`,
-    body:`Dear ${name},\n\nI hope you are doing well. I'm reaching out regarding your current leave of absence (Case ${caseId}).\n\nOur records show that we have not yet received your completed medical certification form. As a reminder, this certification is required to support your leave request and must be submitted within 15 days of your leave start date.\n\nPlease have your healthcare provider complete and return the enclosed WH-380 form at your earliest convenience. If you need an extension or have questions, please contact HR directly.\n\nRequired action: Return completed medical certification to hr@crestlinemfg.com or fax to (555) 234-5678 by [DUE DATE].\n\nThank you for your prompt attention to this matter.\n\nWarm regards,\nHR Department\nCrestline Manufacturing\nhr@crestlinemfg.com`
-  }),
-  info: (name,caseId)=>({
-    subj:`Follow-Up: Additional Information Needed for Your Leave Request — ${caseId}`,
-    body:`Dear ${name},\n\nThank you for submitting your leave of absence request (Case ${caseId}). We are working to process it as quickly as possible.\n\nTo move forward with your approval, we need a few additional details from you:\n\n• Anticipated start and return dates (if not already provided)\n• Supervisor acknowledgment of your leave\n• Confirmation that accrued vacation has been or will be applied\n\nPlease reply to this email or contact us at hr@crestlinemfg.com within 2 business days so we can finalize your request.\n\nWarm regards,\nHR Department\nCrestline Manufacturing`
-  }),
-  return: (name,caseId)=>({
-    subj:`Return-to-Work — Action Required Before Your Return Date — ${caseId}`,
-    body:`Dear ${name},\n\nWe are looking forward to welcoming you back! As your return date approaches, we want to make sure everything is in order.\n\nPlease complete the following before your return:\n\n1. Return-to-Work Medical Clearance — Please have your physician complete the enclosed fit-for-duty form and return it to HR at least 2 business days before your scheduled return.\n\n2. Schedule a Check-In — Please contact HR to schedule a brief return-to-work meeting.\n\n3. Updated Contact Information — Please confirm your current phone number and address on file.\n\nIf your return date needs to be modified, please notify HR as soon as possible.\n\nWe look forward to having you back!\n\nWarm regards,\nHR Department\nCrestline Manufacturing`
-  }),
-  reminder: (name,caseId)=>({
-    subj:`Leave of Absence Update — Case ${caseId}`,
-    body:`Dear ${name},\n\nThis is a friendly reminder regarding your active leave of absence (Case ${caseId}).\n\nPlease take a moment to:\n\n• Confirm your anticipated return date is still accurate\n• Reach out if your medical situation has changed\n• Ensure any outstanding forms or documentation have been submitted to HR\n\nOur goal is to support you during your leave and make your return as smooth as possible. Please don't hesitate to contact us with any questions.\n\nWarm regards,\nHR Department\nCrestline Manufacturing\nhr@crestlinemfg.com`
-  })
+  cert: (name,caseId)=>{
+    const c=coCtx();
+    return {subj:`Action Required: Medical Certification Needed — ${caseId}`,
+    body:`Dear ${name},\n\nI hope you are doing well. I'm reaching out regarding your current leave of absence (Case ${caseId}).\n\nOur records show that we have not yet received your completed medical certification form. As a reminder, this certification is required to support your leave request and must be submitted within 15 days of your leave start date.\n\nPlease have your healthcare provider complete and return the enclosed WH-380 form at your earliest convenience. If you need an extension or have questions, please contact HR directly.\n\nRequired action: Return completed medical certification to ${c.email} or fax to ${c.phone} by [DUE DATE].\n\nThank you for your prompt attention to this matter.\n\nWarm regards,\nHR Department\n${c.name}\n${c.email}`};},
+  info: (name,caseId)=>{
+    const c=coCtx();
+    return {subj:`Follow-Up: Additional Information Needed for Your Leave Request — ${caseId}`,
+    body:`Dear ${name},\n\nThank you for submitting your leave of absence request (Case ${caseId}). We are working to process it as quickly as possible.\n\nTo move forward with your approval, we need a few additional details from you:\n\n• Anticipated start and return dates (if not already provided)\n• Supervisor acknowledgment of your leave\n• Confirmation that accrued vacation has been or will be applied\n\nPlease reply to this email or contact us at ${c.email} within 2 business days so we can finalize your request.\n\nWarm regards,\nHR Department\n${c.name}`};},
+  return: (name,caseId)=>{
+    const c=coCtx();
+    return {subj:`Return-to-Work — Action Required Before Your Return Date — ${caseId}`,
+    body:`Dear ${name},\n\nWe are looking forward to welcoming you back! As your return date approaches, we want to make sure everything is in order.\n\nPlease complete the following before your return:\n\n1. Return-to-Work Medical Clearance — Please have your physician complete the enclosed fit-for-duty form and return it to HR at least 2 business days before your scheduled return.\n\n2. Schedule a Check-In — Please contact HR to schedule a brief return-to-work meeting.\n\n3. Updated Contact Information — Please confirm your current phone number and address on file.\n\nIf your return date needs to be modified, please notify HR as soon as possible.\n\nWe look forward to having you back!\n\nWarm regards,\nHR Department\n${c.name}`};},
+  reminder: (name,caseId)=>{
+    const c=coCtx();
+    return {subj:`Leave of Absence Update — Case ${caseId}`,
+    body:`Dear ${name},\n\nThis is a friendly reminder regarding your active leave of absence (Case ${caseId}).\n\nPlease take a moment to:\n\n• Confirm your anticipated return date is still accurate\n• Reach out if your medical situation has changed\n• Ensure any outstanding forms or documentation have been submitted to HR\n\nOur goal is to support you during your leave and make your return as smooth as possible. Please don't hesitate to contact us with any questions.\n\nWarm regards,\nHR Department\n${c.name}\n${c.email}`};}
 };
 let currentEmailType = 'cert';
 function setEmailType(type, label) {
@@ -2055,7 +2078,9 @@ function openEmailModal(id) {
   emailCaseId = id;
   const r = loaData.find(x=>x.id===id);
   if(!r) return;
-  document.getElementById('emailTo').value = r.name.toLowerCase().replace(' ','.')+('@crestlinemfg.com');
+  const ctx = coCtx();
+  document.getElementById('emailTo').value = r.name.toLowerCase().replace(/\s+/g,'.') + '@' + ctx.domain;
+  document.getElementById('emailCC').value = ctx.email;
   const tmpl = emailTemplates['cert'](r.name, r.id);
   document.getElementById('emailSubject').value = tmpl.subj;
   document.getElementById('emailBody').value = tmpl.body;
@@ -2084,7 +2109,7 @@ let emailLogEntries=[];
 function addEmailLog(name,type,caseId){
   const now=new Date();
   const time=now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-  emailLogEntries.unshift({name,type,caseId,time});
+  emailLogEntries.unshift({name,type,caseId,time,hrEmail:coCtx().email});
   const list=document.getElementById('emailLogList');
   const count=document.getElementById('emailLogCount');
   count.textContent=`${emailLogEntries.length} sent today`;
@@ -2093,7 +2118,7 @@ function addEmailLog(name,type,caseId){
       <div class="el-dot"></div>
       <div style="flex:1">
         <div class="el-name">${e.name} <span style="font-weight:400;color:var(--muted)">· ${e.caseId}</span></div>
-        <div class="el-desc">${e.type} email sent · CC: hr@crestlinemfg.com</div>
+        <div class="el-desc">${e.type} email sent · CC: ${e.hrEmail||'hr@crestlinemfg.com'}</div>
       </div>
       <div class="el-time">${e.time}</div>
     </div>`).join('');
@@ -2547,7 +2572,7 @@ async function pcSend() {
   try {
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:apiHeaders(),body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,system:SYSTEM,messages:pcHistory.slice(-8)})});
     const data=await res.json();
-    const reply=data.content?.find(b=>b.type==='text')?.text||"I couldn't find that in the handbook. Please contact hr@crestlinemfg.com.";
+    const reply=data.content?.find(b=>b.type==='text')?.text||`I couldn't find that in the handbook. Please contact HR directly at ${coCtx().email}.`;
     pcHistory.push({role:'assistant',content:reply});
     pcRemoveTyping(); pcAppend('bot',reply);
   } catch(e){ pcRemoveTyping(); pcAppend('bot','Connection error. Please try again.'); }
@@ -5259,21 +5284,35 @@ function finishLogin(role, company) {
   if (badge) { badge.textContent = userRole === 'client' ? 'Client View' : 'HR Admin'; badge.className = 'role-badge ' + userRole; }
   if (userRole === 'client') showView('analytics');
   renderAnalytics();
-  renderAttention(COMPANIES[company || 'Crestline'].attention);
-  renderUpcoming(COMPANIES[company || 'Crestline'].upcoming);
+  renderAttention(COMPANIES[safeCompany].attention);
+  renderUpcoming(COMPANIES[safeCompany].upcoming);
 }
 
 async function logout() {
   await _sb.auth.signOut();
+  // clear all session state
+  currentEmployee = null;
+  userRole = 'admin';
+  window.hrPending = [];
+  window.savedEmployee = null;
+  window.savedEmpLoa = null;
+  empHistory = [];
+  pcHistory = [];
+  emailLogEntries = [];
+  const emailLogList = document.getElementById('emailLogList');
+  if (emailLogList) emailLogList.innerHTML = '';
+  const emailCount = document.getElementById('emailLogCount');
+  if (emailCount) emailCount.textContent = '0 sent today';
+  const backBtn = document.getElementById('backToEmpBtn');
+  if (backBtn) backBtn.style.display = 'none';
+  // reset shells
   document.getElementById('hr-shell').style.display = 'none';
   document.getElementById('emp-shell').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   showEmpLogin();
-  currentEmployee = null;
   document.getElementById('loginFirstName').value = '';
   document.getElementById('loginLastName').value = '';
   document.getElementById('loginEmpId').value = '';
-  empHistory = [];
 }
 
 // auto-login if session already exists (page refresh)
@@ -5312,7 +5351,7 @@ function renderEmpLeaveStatus() {
         <div class="loa-check-head">Good to Know</div>
         <div class="loa-check-item"><div class="loa-check-icon">🏥</div><div class="loa-check-body"><strong>FMLA / CFRA Leave</strong><span>You may be eligible for up to 12 weeks of protected leave for a serious health condition or family care need. Must have 12 months of employment and 1,250 hours worked.</span></div></div>
         <div class="loa-check-item"><div class="loa-check-icon">👶</div><div class="loa-check-body"><strong>Baby Bonding Leave</strong><span>After the birth, adoption, or foster placement of a child, you may be eligible for up to 12 weeks of CFRA baby bonding leave.</span></div></div>
-        <div class="loa-check-item"><div class="loa-check-icon">💬</div><div class="loa-check-body"><strong>Have Questions?</strong><span>Use the Ask HR tab to get answers about leave policies, or contact HR directly at hr@crestlinemfg.com.</span></div></div>
+        <div class="loa-check-item"><div class="loa-check-icon">💬</div><div class="loa-check-body"><strong>Have Questions?</strong><span>Use the Ask HR tab to get answers about leave policies, or contact HR directly at ${coCtx().email}.</span></div></div>
       </div>`;
     return;
   }
@@ -5391,7 +5430,7 @@ function renderEmpLeaveStatus() {
             <span>${a.note}${a.date ? ` &nbsp;·&nbsp; Due: <b>${a.date}</b>` : ''}</span>
           </div>
         </div>`).join('')}
-      <div class="loa-check-item"><div class="loa-check-icon">📧</div><div class="loa-check-body"><strong>Questions?</strong><span>Contact your HR team at hr@crestlinemfg.com or call (555) 234-5678.</span></div></div>
+      <div class="loa-check-item"><div class="loa-check-icon">📧</div><div class="loa-check-body"><strong>Questions?</strong><span>Contact your HR team at ${coCtx().email} or call ${coCtx().phone}.</span></div></div>
     </div>` : `
     <div style="background:var(--green-bg);border:1px solid #bbf7d0;border-radius:var(--r);padding:16px 18px;margin-bottom:16px;font-size:.85rem;color:#166534">
       ✅ <strong>You're all caught up.</strong> No action is needed from you right now. HR will reach out if anything changes.
