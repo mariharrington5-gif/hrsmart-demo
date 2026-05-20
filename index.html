@@ -4656,7 +4656,7 @@ function loadTemplate() {
 loadTemplate();
 
 function toggleSec(i){const b=document.getElementById('sb'+i),a=document.getElementById('sa'+i);b.classList.toggle('open');a.textContent=b.classList.contains('open')?'▲':'▼';}
-function saveTemplate(){alert('✅ Template "'+tmplData[curTmpl].title+'" saved!\n\nReady to roll out from the Roll Out tab.');}
+function saveTemplate(){showToast('Template Saved ✓', '"'+tmplData[curTmpl].title+'" saved — ready to roll out from the Roll Out tab.');}
 
 async function aiGenerateQuestions(){
   const btn=document.getElementById('aiGenBtn'),role=document.getElementById('tmplRole').value||'general employee';
@@ -5286,6 +5286,9 @@ function empTab(id, btn) {
   document.querySelectorAll('.emp-view').forEach(v => v.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('emp-' + id).classList.add('active');
+  // Re-render live data when switching to these tabs
+  if (id === 'mystatus' && typeof renderEmpLeaveStatus === 'function') renderEmpLeaveStatus();
+  if (id === 'docs' && typeof renderEmpDocs === 'function') renderEmpDocs();
 }
 
 // ══ EMPLOYEE BENEFITS (mirror from HR portal data) ══
@@ -5374,9 +5377,9 @@ function elSelLeave(el,t){
 }
 function elSubmit(){
   const fn=document.getElementById('el-fn').value.trim(),ln=document.getElementById('el-ln').value.trim(),sd=document.getElementById('el-sd').value;
-  if(!fn||!ln){alert('Please enter your name.');return;}
-  if(!elLeave){alert('Please select a leave type.');return;}
-  if(!sd){alert('Please enter a start date.');return;}
+  if(!fn||!ln){showToast('Name required','Please enter your first and last name.','warn');return;}
+  if(!elLeave){showToast('Leave type required','Please select a type of leave.','warn');return;}
+  if(!sd){showToast('Start date required','Please enter your leave start date.','warn');return;}
   const fmt=d=>{if(!d)return'TBD';const[y,m,day]=d.split('-');return`${m}/${day}/${y}`};
   const ed=document.getElementById('el-ed').value;
   const dept=document.getElementById('el-dept').value||'—';
@@ -5550,10 +5553,16 @@ function empOpenDoc(id) {
 
 <style>
 @media print {
-  body > *:not(#reportModal) { display: none !important; }
+  body > *:not(#reportModal):not(#docViewerModal) { display: none !important; }
+  /* Leave History Report */
   #reportModal { display: block !important; position: static !important; background: none !important; padding: 0 !important; }
   #reportModal > div { box-shadow: none !important; border-radius: 0 !important; }
   #reportModal > div > div:first-child { display: none !important; }
+  /* Document Viewer (Employee Handbook, etc.) */
+  #docViewerModal { display: block !important; position: static !important; background: none !important; padding: 0 !important; }
+  #docViewerModal > div { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+  #docViewerModal > div > div:first-child { display: none !important; }
+  #docViewerBody { max-height: none !important; overflow: visible !important; padding: 20px !important; }
 }
 </style>
 
